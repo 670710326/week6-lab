@@ -39,7 +39,9 @@ func main() {
     mux.HandleFunc("GET /api/movies/{id}", h.GetMovie)
     mux.HandleFunc("GET /api/movies/{id}/reviews", h.ListReviews)
     
-     origins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
-    log.Println("MovieHub API ฟังอยู่ที่ :8080 ต้อนรับ", origins)
-    log.Fatal(http.ListenAndServe(":8080", mw.Logging(mw.CORS(origins, mux))))
-}
+    
+origins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8080"
+    }
