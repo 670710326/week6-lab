@@ -5,14 +5,15 @@ import (
     "log"
     "net/http"
     "strconv"
-	"moviehub/auth"	
+
     "moviehub/store"
+    "moviehub/auth"
     "errors"
 )
 
 type Handler struct {
     Store *store.Store
-	Tickets *auth.Issuer
+    Tickets *auth.Issuer
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -60,6 +61,7 @@ func (h *Handler) ListReviews(w http.ResponseWriter, r *http.Request) {
     }
     writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
+
 func (h *Handler) GetMovie(w http.ResponseWriter, r *http.Request) {
     id, ok := pathID(r, "id")
     if !ok {

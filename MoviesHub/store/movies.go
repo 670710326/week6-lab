@@ -7,17 +7,24 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Movie คือหนังหนึ่งเรื่องในรายการ ใช้กับหน้าค้นหา
 type Movie struct {
-	ID      int64   `json:"id"`
-	Title   string  `json:"title"`
-	TitleTh *string `json:"titleTh"`
-	Genre   *string `json:"genre"`
-	Year    *int    `json:"year"`
-	Rating  float64 `json:"rating"`
-	Poster  *string `json:"poster"`
+	ID      int64    `json:"id"`
+	Title   string   `json:"title"`
+	TitleTh *string  `json:"title_th"`
+	Genre   *string  `json:"genre"`
+	Year    *int     `json:"year"`
+	Rating  *float64 `json:"rating"`
+	Poster  *string  `json:"poster"`
 }
 
-// SearchMovies ค่าจากผู้ใช้เดินทางผ่าน $1 แยกจากคำสั่งเสมอ
+// MovieDetail คือหนังหนึ่งเรื่องพร้อมเรื่องย่อ ใช้กับหน้ารายละเอียด
+type MovieDetail struct {
+	Movie
+	Detail *string `json:"detail"`
+}
+
+// SearchMovies ค้นหนังจากชื่ออังกฤษหรือชื่อไทย ถ้า q ว่างจะคืนหนังคะแนนสูงสุด
 func (s *Store) SearchMovies(ctx context.Context, q string) ([]Movie, error) {
 	rows, err := s.Pool.Query(ctx,
 		`SELECT m.id, m.title, m.title_th,
@@ -26,30 +33,27 @@ func (s *Store) SearchMovies(ctx context.Context, q string) ([]Movie, error) {
                   WHERE mg.movie_id = m.id AND mg.position = 0),
                 extract(year FROM m.release_date)::int,
                 round(m.vote_average, 1)::float8,
-                CASE WHEN m.poster_path LIKE 'http%' THEN m.poster_path
-                     ELSE 'https://image.tmdb.org/t/p/w500' || m.poster_path END
+                'https://image.tmdb.org/t/p/w500' || m.poster_path
          FROM movies m
-         WHERE lower(m.title) LIKE '%' || lower($1) || '%'
-         ORDER BY m.popularity DESC`, q)
+         WHERE $1 = ''
+            OR m.title ILIKE '%' || $1 || '%'
+            OR m.title_th ILIKE '%' || $1 || '%'
+         ORDER BY m.vote_average DESC NULLS LAST, m.id
+         LIMIT 1000`, q)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []Movie{}
+
+	items := []Movie{}
 	for rows.Next() {
 		var m Movie
 		if err := rows.Scan(&m.ID, &m.Title, &m.TitleTh, &m.Genre, &m.Year, &m.Rating, &m.Poster); err != nil {
 			return nil, err
 		}
-		out = append(out, m)
+		items = append(items, m)
 	}
-	return out, rows.Err()
-}
-
-// MovieDetail คือหนังหนึ่งเรื่องพร้อมเรื่องย่อ ใช้กับหน้ารายละเอียด
-type MovieDetail struct {
-	Movie
-	Detail *string `json:"detail"`
+	return items, rows.Err()
 }
 
 // GetMovie หาหนังจากเลข ไม่พบตอบ ErrNotFound
@@ -62,7 +66,8 @@ func (s *Store) GetMovie(ctx context.Context, id int64) (MovieDetail, error) {
                   WHERE mg.movie_id = m.id AND mg.position = 0),
                 extract(year FROM m.release_date)::int,
                 round(m.vote_average, 1)::float8,
-                'https://image.tmdb.org/t/p/w500' || m.poster_path,
+                CASE WHEN m.poster_path LIKE 'http%' THEN m.poster_path
+                ELSE 'https://image.tmdb.org/t/p/w500' || m.poster_path END,
                 coalesce(m.overview_th, m.overview)
          FROM movies m
          WHERE m.id = $1`, id).

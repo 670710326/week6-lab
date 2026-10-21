@@ -1,1 +1,3 @@
-package peek
+package main
+
+func main() {}
