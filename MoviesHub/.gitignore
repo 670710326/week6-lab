@@ -1,1 +1,5 @@
+.env
+.env.*
+!.env.example
 .jwt_secret
+app
